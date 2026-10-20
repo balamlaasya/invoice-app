@@ -1,4 +1,5 @@
 import { useState } from "react";
+import LineItemsTable from "./LineItemsTable";
 
 type Item = {
   id: number;
@@ -9,16 +10,7 @@ type Item = {
 
 type DocStatus = "QUOTATION" | "INVOICE";
 
-const GST_RATE = 0.18;
-
-const initialItems: Item[] = [
-  { id: 1, description: "Website Design", qty: 1, price: 15000 },
-  { id: 2, description: "Logo & Branding", qty: 1, price: 5000 },
-  { id: 3, description: "Hosting (1 year)", qty: 1, price: 3000 },
-];
-
-const formatINR = (n: number) =>
-  "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+const initialItems: Item[] = [];
 
 export default function InvoicePDF() {
   const [status, setStatus] = useState<DocStatus>("QUOTATION");
@@ -26,48 +18,15 @@ export default function InvoicePDF() {
   const [issuedOn, setIssuedOn] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>(initialItems);
 
-  // Price snapshot: frozen copy of items + totals taken at conversion
-  const [snapshot, setSnapshot] = useState<{
-    items: Item[];
-    subtotal: number;
-    tax: number;
-    total: number;
-  } | null>(null);
+  // Price snapshot: frozen copy of items taken at conversion
+  const [snapshot, setSnapshot] = useState<Item[] | null>(null);
 
   const locked = status === "INVOICE";
-
-  const liveSubtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
-  const liveTax = liveSubtotal * GST_RATE;
-  const liveTotal = liveSubtotal + liveTax;
-
-  // Once converted, always show the locked snapshot
-  const shownItems = snapshot ? snapshot.items : items;
-  const subtotal = snapshot ? snapshot.subtotal : liveSubtotal;
-  const tax = snapshot ? snapshot.tax : liveTax;
-  const total = snapshot ? snapshot.total : liveTotal;
-
-  const updateItem = (id: number, field: keyof Item, value: string) => {
-    if (locked) return;
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? {
-              ...i,
-              [field]: field === "description" ? value : Number(value) || 0,
-            }
-          : i
-      )
-    );
-  };
+  const shownItems = snapshot ?? items;
 
   const handleConvert = () => {
     if (locked) return;
-    setSnapshot({
-      items: items.map((i) => ({ ...i })),
-      subtotal: liveSubtotal,
-      tax: liveTax,
-      total: liveTotal,
-    });
+    setSnapshot(items.map((i) => ({ ...i })));
     setDocNumber("INV-2026-001");
     setStatus("INVOICE");
     setIssuedOn(new Date().toLocaleDateString("en-IN"));
@@ -116,20 +75,6 @@ export default function InvoicePDF() {
         .billto { margin: 20px 0; font-size: 13px; }
         .billto h3 { margin: 0 0 4px; font-size: 12px; color: #6b7280; text-transform: uppercase; }
 
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 1px solid #d1d5db; }
-        td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
-        .num { text-align: right; }
-        td input {
-          width: 100%; border: 1px solid #d1d5db; border-radius: 4px; padding: 4px 6px; font-size: 13px;
-        }
-        td input.small { width: 80px; text-align: right; }
-        td input:disabled { border-color: transparent; background: transparent; color: #111827; }
-
-        .totals { width: 260px; margin: 16px 0 0 auto; font-size: 13px; }
-        .totals div { display: flex; justify-content: space-between; padding: 5px 0; }
-        .totals .grand { border-top: 2px solid #111827; font-weight: 700; font-size: 15px; margin-top: 4px; padding-top: 8px; }
-
         .footer { margin-top: 40px; font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 10px; }
 
         /* ---------- PRINT RULES ---------- */
@@ -138,7 +83,7 @@ export default function InvoicePDF() {
         @media print {
           body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .page-wrapper { padding: 0; }
-          .no-print { display: none !important; }   /* hides buttons/clutter */
+          .no-print { display: none !important; }
           .a4 { box-shadow: none; margin: 0; width: 210mm; min-height: 297mm; padding: 15mm; }
           td input { border: none !important; background: transparent !important; padding: 0; }
           tr { page-break-inside: avoid; }
@@ -184,56 +129,11 @@ export default function InvoicePDF() {
           <div>client@email.com</div>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Description</th>
-              <th className="num">Qty</th>
-              <th className="num">Rate</th>
-              <th className="num">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shownItems.map((item, idx) => (
-              <tr key={item.id}>
-                <td>{idx + 1}</td>
-                <td>
-                  <input
-                    value={item.description}
-                    disabled={locked}
-                    onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                  />
-                </td>
-                <td className="num">
-                  <input
-                    className="small"
-                    type="number"
-                    value={item.qty}
-                    disabled={locked}
-                    onChange={(e) => updateItem(item.id, "qty", e.target.value)}
-                  />
-                </td>
-                <td className="num">
-                  <input
-                    className="small"
-                    type="number"
-                    value={item.price}
-                    disabled={locked}
-                    onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                  />
-                </td>
-                <td className="num">{formatINR(item.qty * item.price)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="totals">
-          <div><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
-          <div><span>GST ({GST_RATE * 100}%)</span><span>{formatINR(tax)}</span></div>
-          <div className="grand"><span>Total</span><span>{formatINR(total)}</span></div>
-        </div>
+        <LineItemsTable
+          items={shownItems}
+          setItems={setItems}
+          isLocked={locked}
+        />
 
         <div className="footer">
           Payment due within 15 days. Thank you for your business.
