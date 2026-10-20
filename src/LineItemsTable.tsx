@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 
 export type Item = {
   id: number;
@@ -9,7 +9,7 @@ export type Item = {
 
 export type LineItemsTableProps = {
   items?: Item[];
-  setItems?: React.Dispatch<React.SetStateAction<Item[]>>;
+  setItems?: Dispatch<SetStateAction<Item[]>>;
   isLocked?: boolean;
 };
 
@@ -112,7 +112,10 @@ export function LineItemsTable({
                 Line Total (₹)
               </th>
               {!isLocked && (
-                <th style={{ padding: "12px 16px", width: "96px", textAlign: "center" }}>
+                <th
+                  className="no-print"
+                  style={{ padding: "12px 16px", width: "96px", textAlign: "center" }}
+                >
                   Action
                 </th>
               )}
@@ -230,7 +233,10 @@ export function LineItemsTable({
                       {formatINR(lineTotal)}
                     </td>
                     {!isLocked && (
-                      <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                      <td
+                        className="no-print"
+                        style={{ padding: "10px 16px", textAlign: "center" }}
+                      >
                         <button
                           type="button"
                           onClick={() => handleRemoveRow(item.id)}
@@ -269,7 +275,7 @@ export function LineItemsTable({
           gap: "16px",
         }}
       >
-        <div>
+        <div className="no-print">
           {!isLocked && (
             <button
               type="button"
@@ -297,6 +303,7 @@ export function LineItemsTable({
             padding: "16px",
             borderRadius: "10px",
             border: "1px solid #e2e8f0",
+            marginLeft: "auto",
           }}
         >
           <div
@@ -348,6 +355,5 @@ export function LineItemsTable({
     </div>
   );
 }
-export default LineItemsTable;
 
 export default LineItemsTable;
