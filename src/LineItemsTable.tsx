@@ -15,6 +15,10 @@ export type LineItemsTableProps = {
 
 const GST_RATE = 0.18; // 18% GST (no 5% discount)
 
+// Paste Deepak's Supabase Project URL and anon key here once he shares them in the group:
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
 const DEFAULT_ITEMS: Item[] = [];
 
 export function formatINR(amount: number): string {
@@ -34,6 +38,7 @@ export function LineItemsTable({
   isLocked = false,
 }: LineItemsTableProps) {
   const [internalItems, setInternalItems] = useState<Item[]>(DEFAULT_ITEMS);
+  const [saveStatus, setSaveStatus] = useState<string>("");
 
   const items = externalItems ?? internalItems;
   const setItems = externalSetItems ?? setInternalItems;
@@ -42,10 +47,12 @@ export function LineItemsTable({
     const nextId =
       items.length > 0 ? Math.max(...items.map((item) => item.id)) + 1 : 1;
     setItems([...items, { id: nextId, description: "", qty: 1, price: 0 }]);
+    setSaveStatus("");
   };
 
   const handleRemoveRow = (id: number) => {
     setItems(items.filter((item) => item.id !== id));
+    setSaveStatus("");
   };
 
   const handleUpdateRow = (
@@ -58,6 +65,7 @@ export function LineItemsTable({
         item.id === id ? { ...item, [field]: value } : item
       )
     );
+    setSaveStatus("");
   };
 
   const subtotal = items.reduce(
@@ -66,6 +74,45 @@ export function LineItemsTable({
   );
   const gstAmount = subtotal * GST_RATE;
   const grandTotal = subtotal + gstAmount;
+
+  // Inserts invoice data into Supabase
+  const handleSaveToSupabase = async () => {
+    const invoicePayload = {
+      subtotal,
+      gst_amount: gstAmount,
+      grand_total: grandTotal,
+      items,
+      created_at: new Date().toISOString(),
+    };
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      setSaveStatus(
+        `Invoice data ready (${formatINR(grandTotal)})! Add Supabase URL & key to sync.`
+      );
+      return;
+    }
+
+    try {
+      setSaveStatus("Saving to Supabase...");
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/invoices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify(invoicePayload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to insert into Supabase");
+      }
+      setSaveStatus("Saved to Supabase successfully ✓");
+    } catch {
+      setSaveStatus("Error saving to Supabase. Check table name & API key.");
+    }
+  };
 
   return (
     <div
@@ -275,24 +322,50 @@ export function LineItemsTable({
           gap: "16px",
         }}
       >
-        <div className="no-print">
-          {!isLocked && (
+        <div
+          className="no-print"
+          style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+        >
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {!isLocked && (
+              <button
+                type="button"
+                onClick={handleAddRow}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  backgroundColor: "#4f46e5",
+                  color: "#ffffff",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                + Add Line Item
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleAddRow}
+              onClick={handleSaveToSupabase}
               style={{
                 padding: "8px 16px",
                 borderRadius: "8px",
                 border: "none",
-                backgroundColor: "#4f46e5",
+                backgroundColor: "#059669",
                 color: "#ffffff",
                 fontSize: "14px",
                 fontWeight: 600,
                 cursor: "pointer",
               }}
             >
-              + Add Line Item
+              Save Invoice to Supabase
             </button>
+          </div>
+          {saveStatus && (
+            <span style={{ fontSize: "12px", color: "#059669", fontWeight: 500 }}>
+              {saveStatus}
+            </span>
           )}
         </div>
 
